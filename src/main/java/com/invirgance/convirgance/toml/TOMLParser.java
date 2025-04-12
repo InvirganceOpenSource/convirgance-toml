@@ -18,6 +18,7 @@ public class TOMLParser implements AutoCloseable
     private BufferedReader reader;
     private String line;
     private StringBuilder buffer;
+    private boolean first;
     
     public TOMLParser(BufferedReader reader)
     {
@@ -27,9 +28,9 @@ public class TOMLParser implements AutoCloseable
     
     private JSONObject parseObject() throws Exception
     {
+        first = true;
         buffer = new StringBuilder();
         buffer.append("{");
-        
         
         while ((line = reader.readLine()) != null)
         {
@@ -39,33 +40,35 @@ public class TOMLParser implements AutoCloseable
             if (line.startsWith("#") || line.isEmpty()) continue;
             
             
-            // Table name
-            
-                    
+            // TODO: Table name logic
+ 
             // Key value pair
-            if (line.contains("=")) parseKeyValue();
-                    
-                    
-            // multi-line comment
+            if (line.contains("=")) 
+            {
+                // separate from previously written key-value pair if not first
+                if (!first) buffer.append(",");
+                parseKeyValue();
+                first = false;
+            }  
         }
+        
+        buffer.append("}");
+        
+        return new JSONObject(buffer.toString());
     }
     
     
     private void parseKeyValue() throws Exception
     {
-        String[] tokens = line.split("=", 2);
+        String[] tokens = line.split("=", 2); // this assumes there is no '=' in the key
         String key = parseKey(tokens[0].trim());
+        Object value = parseValue(tokens[1].trim());
         
-        buffer.append("\"");
         buffer.append("\"");
         buffer.append(key);
         buffer.append("\": ");
-        
-        
-        Object value = parseValue(tokens[1].trim());
-        
+        buffer.append(value.toString()); 
     }
-    
     
     
     private String parseKey(String key) throws Exception
@@ -99,18 +102,15 @@ public class TOMLParser implements AutoCloseable
         return ((key.startsWith("\"") && key.endsWith("\"")) || (key.startsWith("'") && key.endsWith("'")));
     }
     
-    
 //    private boolean isDotted(String key)
 //    {
 //        
 //    }
-    
-    
+
     private boolean isBare(String key)
     {
         return (key.matches("^[a-zA-Z0-9_-]+$"));
     }
-    
     
     
     private Object parseValue(String value)
@@ -121,13 +121,16 @@ public class TOMLParser implements AutoCloseable
             value = trimComment(value);
         }
         
-        // then work with the rest of the value
+        // TODO: lots of logic here, value can be many things including other 
+        
+        return value;
     }
+    
     
     
     private String trimComment(String value)
     {
-            
+       return value; // TODO: remove comment at the end     
     }
     
     
