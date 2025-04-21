@@ -34,31 +34,27 @@ public class TOMLParser implements AutoCloseable
     }
     
 
-    private JSONObject parseObject() throws Exception
+    public JSONObject parseObject() throws Exception
     {
         return parseNestedObject(0);
     }
     
     private JSONObject parseNestedObject(int level) throws Exception
     {
+        JSONObject object = new JSONObject(true);
         int currentLevel = level;
         String key;
         String value;
 
-        buffer = new StringBuilder();
 
+        // will need a while loop until no key-value pairs are left
         key = parseKey();
         value = parseValue();
+        object.put(key, value);
 
-        buffer.append("{ ");
-        buffer.append("\"");
-        buffer.append(key);
-        buffer.append("\"");
-        buffer.append(": ");
-        buffer.append(value);
-        buffer.append(" }");
 
-        return new JSONObject(buffer.toString());
+
+        return object;
     }
     
 
@@ -74,7 +70,15 @@ public class TOMLParser implements AutoCloseable
         line = line.trim(); // is this needed?
 
         //parse key
-        if (isQuoted(line))
+        if (isArray(line))
+        {
+            return parseArrayKey();
+        }  
+        else if (isTable(line))
+        {
+            return parseTableKey();
+        }
+        else if (isQuoted(line))
         {
             return parseQuotedKey();
         }
@@ -89,14 +93,6 @@ public class TOMLParser implements AutoCloseable
         else if (isDotted(line))
         {
             return parseDottedKey();
-        }
-        else if (isArray(line))
-        {
-            return parseArrayKey();
-        }  
-        else if (isTable(line))
-        {
-            return parseTableKey();
         }
         else
         {
@@ -292,43 +288,115 @@ public class TOMLParser implements AutoCloseable
 
 
 
-    private boolean isQuoted(String key)
+    private boolean isQuoted(String line)
     {
-        return (key.startsWith("\""));
+        return (line.startsWith("\""));
     }
 
-    private boolean isSingleQuoted(String key)
+    private boolean isSingleQuoted(String line)
     {
-        return (key.startsWith("'"));
+        return (line.startsWith("'"));
     }
 
-    private boolean isBare(String key)
+    private boolean isArray(String line)
     {
-        return (key.matches("^[a-zA-Z0-9_-]+$"));
+        return (line.startsWith("[["));
+    }   
+
+    private boolean isTable(String line)
+    {
+        return (line.startsWith("["));
     }
 
-    private boolean isDotted(String key)
+    private boolean isBare(String line)
+    {
+        char c;
+        boolean whitespace = false;
+        boolean bare = false;
+        int i;
+        
+
+        // Check each character in the key
+        for (i = 0; i < line.length(); i++) 
+        {
+            c = line.charAt(i);
+
+            if ((c == ' ' || c == '\t')) 
+            {
+                if (!bare) continue; // skips through preceding whitespace
+
+                whitespace = true;  // sets flag for whitespace and breaks out of loop
+                break;  
+            }
+            else if (c == '=' && bare)
+            {   
+                return true;
+            }
+            else if (isAllowed(c))
+            {
+                bare = true;
+            }
+
+
+        if (whitespace)
+        {
+            while (i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t'))
+            {
+                i++;
+            }
+
+            if (i < line.length() && line.charAt(i) == '=')
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+
+            throw new Exception("Invalid TOML Key Format: " + line);
+        }
+
+                
+        }
+
+        if (whitespace)
+        {
+            while (i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t'))
+            {
+                i++;
+            }
+            
+            if (line.charAt(i) == '=')
+            {
+                return true;
+            }
+        }
+
+        
+        return false;
+    }
+
+    private boolean isDotted(String line)
     {
        // TODO: 
        return false;
     }
 
-    private boolean isArray(String key)
-    {
-        return (key.startsWith("[["));
-    }   
 
-    private boolean isTable(String key)
+    private boolean isAllowed(char c)
     {
-        return (key.startsWith("["));
+        return (c >= 'a' && c <= 'z') || 
+               (c >= 'A' && c <= 'Z') || 
+               (c >= '0' && c <= '9') || 
+               c == '_' || c == '-';
     }
     
     
 
 
     
-    
-    
+
 
     @Override
     public void close() throws Exception
