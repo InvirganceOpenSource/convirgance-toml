@@ -8,6 +8,8 @@ import com.invirgance.convirgance.json.JSONObject;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.util.HashMap;
+import java.util.List;
 
 /**
  *
@@ -15,127 +17,319 @@ import java.io.Reader;
  */
 public class TOMLParser implements AutoCloseable
 {
+    private String mode;
     private BufferedReader reader;
     private String line;
     private StringBuilder buffer;
-    private boolean first;
+    private HashMap<String, List<String>> arrays;
+    private List<String> tables;
+    private String keyType;
+//    private boolean first;
+    
+
     
     public TOMLParser(BufferedReader reader)
     {
         this.reader = reader;
     }
     
-    
+
     private JSONObject parseObject() throws Exception
     {
-        first = true;
+        return parseNestedObject(0);
+    }
+    
+    private JSONObject parseNestedObject(int level) throws Exception
+    {
+        int currentLevel = level;
+        String key;
+        String value;
+
         buffer = new StringBuilder();
-        buffer.append("{");
-        
-        while ((line = reader.readLine()) != null)
-        {
-            line = line.trim();
-            
-            // ignore TOML Comment line 
-            if (line.startsWith("#") || line.isEmpty()) continue;
-            
-            
-            // TODO: Table name logic
- 
-            // Key value pair
-            if (line.contains("=")) 
-            {
-                // separate from previously written key-value pair if not first
-                if (!first) buffer.append(",");
-                parseKeyValue();
-                first = false;
-            }  
-        }
-        
-        buffer.append("}");
-        
+
+        key = parseKey();
+        value = parseValue();
+
+        buffer.append("{ ");
+        buffer.append("\"");
+        buffer.append(key);
+        buffer.append("\"");
+        buffer.append(": ");
+        buffer.append(value);
+        buffer.append(" }");
+
         return new JSONObject(buffer.toString());
     }
     
-    
-    private void parseKeyValue() throws Exception
+
+
+    private String parseKey() throws Exception
     {
-        String[] tokens = line.split("=", 2); // this assumes there is no '=' in the key
-        String key = parseKey(tokens[0].trim());
-        Object value = parseValue(tokens[1].trim());
-        
-        buffer.append("\"");
-        buffer.append(key);
-        buffer.append("\": ");
-        buffer.append(value.toString()); 
-    }
-    
-    
-    private String parseKey(String key) throws Exception
-    {
-        // empty key not allowed
-        if (key.isBlank()) throw new Exception("Invalid TOML key");
-        
-        // quoted 
-        if (isQuoted(key))
+        // find non empty, non comment line
+        while (line == null || line.isBlank() || line.startsWith("#"))
         {
-            return key.substring(1, key.length()-1); // remove quotes
-        }
-        
-        // bare
-        if (isBare(key)) 
-        {
-            return key;
+            line = reader.readLine();
         }
 
+        line = line.trim(); // is this needed?
+
+        //parse key
+        if (isQuoted(line))
+        {
+            return parseQuotedKey();
+        }
+        else if (isSingleQuoted(line))
+        {
+            return parseSingleQuotedKey();
+        }
+        else if (isBare(line))
+        {
+            return parseBareKey();
+        }
+        else if (isDotted(line))
+        {
+            return parseDottedKey();
+        }
+        else if (isArray(line))
+        {
+            return parseArrayKey();
+        }  
+        else if (isTable(line))
+        {
+            return parseTableKey();
+        }
+        else
+        {
+            throw new Exception("Invalid TOML Key Format: " + line);
+        }
+    }  
+
+
+    private String parseQuotedKey()
+    {
+        StringBuilder key = new StringBuilder();
+        boolean escaped = false;
+        char c;
+
+        // remove opening quote
+        line = line.substring(1);
+
+
+        // iterate over the line
+        for (int i = 0; i < line.length(); i++)
+        {
+            c = line.charAt(i);
+
+            // handle escaped characters without appending
+            if (c == '\\' && !escaped) 
+            {
+                escaped = true;
+                continue;
+            }
+            // handle closing quote
+            else if (c == '"' && !escaped) 
+            {
+                line = line.substring(i+1);
+                break;
+            }
+
+            // append character
+            if (escaped){
+                key.append("\\");
+            }
+            key.append(c);
+            escaped = false;
+        }
+
+        return key.toString();
+    }
+
+
+
+    private String parseSingleQuotedKey()
+    {
+        StringBuilder key = new StringBuilder();
+        boolean escaped = false;
+        char c;
         
-        // TODO: implement dotted key case
-        
-        
-        // Invalid Key Format
-        throw new Exception("Invalid TOML Key Format: " + key);
+
+        // remove opening quote
+        line = line.substring(1);
+
+        // iterate over the line
+        for (int i = 0; i < line.length(); i++)
+        {
+            c = line.charAt(i);
+
+            // handle escaped characters without appending
+            if (c == '\\' && !escaped) 
+            {
+                escaped = true;
+                continue;
+            }
+            // handle closing quote
+            else if (c == '\'' && !escaped) 
+            {   
+                // remove closing quote from rest of line
+                line = line.substring(i+1);
+                break;
+            }
+
+            // append character
+            if (escaped){
+                key.append("\\");
+            }
+            key.append(c);
+            escaped = false;
+        }
+        return key.toString();    
+    }
+
+    
+    private String parseBareKey()
+    {
+        StringBuilder key = new StringBuilder();
+        char c;
+
+        // iterate over the line
+        for (int i = 0; i < line.length(); i++)
+        {
+            c = line.charAt(i);
+            if (c == '=' || c == ' ' || c == '\t')
+            {
+                line = line.substring(i+1);
+                break;
+            }
+            key.append(c);
+        }
+        return key.toString();
+    }
+   
+    // might need level structure
+    private String parseDottedKey()
+    {
+        StringBuilder key = new StringBuilder();
+        char c;
+
+        // iterate over the line
+        for (int i = 0; i < line.length(); i++)
+        {
+            c = line.charAt(i);
+            if (c == '.')
+            {
+                line = line.substring(i+1);
+                break;
+            }
+            key.append(c);
+        }
+        return key.toString();
+    }
+
+    // PROBLEM can be dotted/quoted inside the brackets, need structure for this, remembering the previous keys and their levels
+    private String parseArrayKey()
+    {
+        StringBuilder key = new StringBuilder();
+        char c;
+
+        // iterate over the line
+        for (int i = 0; i < line.length(); i++)
+        {
+            c = line.charAt(i);
+            if (c == ']')
+            {
+                line = line.substring(i+1);
+                break;
+            }
+            key.append(c);
+        }
+        return key.toString();
+    }
+
+    // PROBLEM can be dotted/quoted inside the brackets, need structure for this, remembering the previous keys and their levels
+    private String parseTableKey()
+    {
+        StringBuilder key = new StringBuilder();
+        char c;
+
+        // iterate over the line
+        for (int i = 0; i < line.length(); i++)
+        {
+            c = line.charAt(i);
+            if (c == ']')
+            {
+                line = line.substring(i+1);
+                break;
+            }
+            key.append(c);
+        }
+        return key.toString();
+    }
+
+
+
+    
+
+
+    private String parseValue()
+    {
+        return null;
     }
     
-    
+    // private Object parseValue(String value)
+    // {
+    //     // first trim the comment at the end of the line if one exists
+    //     if (value.contains("#"))
+    //     {
+    //         value = trimComment(value);
+    //     }
+        
+    //     // TODO: lots of logic here, value can be many things including other 
+        
+    //     return value;
+    // }
+
+
+
+
+
     private boolean isQuoted(String key)
     {
-        return ((key.startsWith("\"") && key.endsWith("\"")) || (key.startsWith("'") && key.endsWith("'")));
+        return (key.startsWith("\""));
     }
-    
-//    private boolean isDotted(String key)
-//    {
-//        
-//    }
+
+    private boolean isSingleQuoted(String key)
+    {
+        return (key.startsWith("'"));
+    }
 
     private boolean isBare(String key)
     {
         return (key.matches("^[a-zA-Z0-9_-]+$"));
     }
-    
-    
-    private Object parseValue(String value)
+
+    private boolean isDotted(String key)
     {
-        // first trim the comment at the end of the line if one exists
-        if (value.contains("#"))
-        {
-            value = trimComment(value);
-        }
-        
-        // TODO: lots of logic here, value can be many things including other 
-        
-        return value;
+       // TODO: 
+       return false;
+    }
+
+    private boolean isArray(String key)
+    {
+        return (key.startsWith("[["));
+    }   
+
+    private boolean isTable(String key)
+    {
+        return (key.startsWith("["));
     }
     
     
-    
-    private String trimComment(String value)
-    {
-       return value; // TODO: remove comment at the end     
-    }
+
+
     
     
     
-    
+
     @Override
     public void close() throws Exception
     {
