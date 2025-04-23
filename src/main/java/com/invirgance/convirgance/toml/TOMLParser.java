@@ -53,7 +53,7 @@ public class TOMLParser implements AutoCloseable
         object.put(key, value);
 
 
-
+        
         return object;
     }
     
@@ -72,26 +72,32 @@ public class TOMLParser implements AutoCloseable
         //parse key
         if (isArray(line))
         {
+System.out.println("array");
             return parseArrayKey();
         }  
         else if (isTable(line))
         {
+System.out.println("table");
             return parseTableKey();
         }
         else if (isQuoted(line))
         {
+System.out.println("quoted key");
             return parseQuotedKey();
         }
         else if (isSingleQuoted(line))
         {
+System.out.println("single quoted key");
             return parseSingleQuotedKey();
         }
         else if (isBare(line))
         {
+System.out.println("bare key");
             return parseBareKey();
         }
         else if (isDotted(line))
         {
+System.out.println("dotted key");
             return parseDottedKey();
         }
         else
@@ -268,7 +274,7 @@ public class TOMLParser implements AutoCloseable
 
     private String parseValue()
     {
-        return null;
+        return "fake value";
     }
     
     // private Object parseValue(String value)
@@ -336,6 +342,10 @@ public class TOMLParser implements AutoCloseable
             {
                 bare = true;
             }
+            else if (!isAllowed(c))
+            {
+                return false;
+            }
 
 
         if (whitespace)
@@ -354,7 +364,7 @@ public class TOMLParser implements AutoCloseable
                 return false;
             }
 
-            throw new Exception("Invalid TOML Key Format: " + line);
+//            throw new Exception("Invalid TOML Key Format: " + line);
         }
 
                 
