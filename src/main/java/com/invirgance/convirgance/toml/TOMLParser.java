@@ -56,8 +56,8 @@ public class TOMLParser implements AutoCloseable
         key = parseKey();
         value = parseValue();
 
-        System.out.println("key: " + key);
-        System.out.println("value: " + value);
+// System.out.println("key: " + key);
+// System.out.println("value: " + value);
 
 
         // figure out the type of the value
@@ -98,14 +98,12 @@ public class TOMLParser implements AutoCloseable
                 // ensure the separator is a T instead of a space
                 value = ((String)value).replace(" ", "T");
                 object.put(key, LocalDateTime.parse((String)value));
-            }
+            }// TODO: add support for offset date-time, inline table, array.
             else
             {
                 object.put(key, value);
             }
         }
-
-        System.out.println("date-time: " + object.get("date-time").getClass());
 
         return object;
     }
@@ -522,9 +520,18 @@ System.out.println("dotted key");
     
     private void skipWhitespace()
     {
-        while (line.charAt(0) == ' ' || line.charAt(0) == '\t')
+        while ((!line.isBlank()) && (line.charAt(0) == ' ' || line.charAt(0) == '\t'))
         {
             line = line.substring(1);
+        }
+        if (line.isBlank())
+        {
+            try {
+                line = reader.readLine();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            skipWhitespace();
         }
     }
 
