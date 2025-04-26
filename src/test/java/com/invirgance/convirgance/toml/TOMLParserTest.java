@@ -21,6 +21,15 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class TOMLParserTest
 {
+    
+    @AfterEach
+    public void printline()
+    {
+        System.out.println("");
+    }
+    
+    
+    
     @Test
     public void test1() throws Exception
     {
@@ -77,6 +86,32 @@ public class TOMLParserTest
     public void test5() throws Exception
     {
         ClasspathSource source = new ClasspathSource("/toml5.toml");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(source.getInputStream(), "UTF-8"));
+        TOMLParser parser = new TOMLParser(reader);
+        
+        JSONObject object = parser.parseObject();
+
+        System.out.println(object.toString());
+    }
+    
+    
+    @Test
+    public void test6() throws Exception
+    {
+        ClasspathSource source = new ClasspathSource("/toml6.toml");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(source.getInputStream(), "UTF-8"));
+        TOMLParser parser = new TOMLParser(reader);
+        
+        JSONObject object = parser.parseObject();
+
+        System.out.println(object.toString());
+    }
+    
+    
+    @Test
+    public void test7() throws Exception
+    {
+        ClasspathSource source = new ClasspathSource("/toml7.toml");
         BufferedReader reader = new BufferedReader(new InputStreamReader(source.getInputStream(), "UTF-8"));
         TOMLParser parser = new TOMLParser(reader);
         
