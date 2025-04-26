@@ -56,6 +56,10 @@ public class TOMLParser implements AutoCloseable
         key = parseKey();
         value = parseValue();
 
+        System.out.println("key: " + key);
+        System.out.println("value: " + value);
+
+
         // figure out the type of the value
         if (value instanceof JSONObject)
         {
@@ -78,19 +82,21 @@ public class TOMLParser implements AutoCloseable
             {
                 object.put(key, Boolean.parseBoolean((String)value));
             }
-            // local date
+            // local date WORKS
             else if (((String)value).matches("\\d{4}-\\d{2}-\\d{2}"))
             {
                 object.put(key, LocalDate.parse((String)value));
             }
-            // local time with optional fractional seconds
-            else if (((String)value).matches("\\d{2}:\\d{2}:\\d{2}\"|.\\d+"))
+            // local time with optional fractional seconds WORKS
+            else if (((String)value).matches("\\d{2}:\\d{2}:\\d{2}") || ((String)value).matches("\\d{2}:\\d{2}:\\d{2}.\\d+"))
             {
                 object.put(key, LocalTime.parse((String)value));
             }
-            // local date time with optional fractional seconds T or space 
-            else if (((String)value).matches("\\d{4}-\\d{2}-\\d{2}\"T| \"\\d{2}:\\d{2}:\\d{2}\"|.\\d+"))
+            // local date time with optional fractional seconds T or space  WORKS
+            else if (((String)value).matches("\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}") || ((String)value).matches("\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}\\.\\d+"))
             {
+                // ensure the separator is a T instead of a space
+                value = ((String)value).replace(" ", "T");
                 object.put(key, LocalDateTime.parse((String)value));
             }
             else
@@ -99,7 +105,7 @@ public class TOMLParser implements AutoCloseable
             }
         }
 
-
+        System.out.println("date-time: " + object.get("date-time").getClass());
 
         return object;
     }
