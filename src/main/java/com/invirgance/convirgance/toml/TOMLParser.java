@@ -6,14 +6,16 @@ package com.invirgance.convirgance.toml;
 
 import com.invirgance.convirgance.json.JSONObject;
 import java.io.BufferedReader;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.HashMap;
 import java.util.List;
-import java.util.function.ToDoubleBiFunction;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import com.invirgance.convirgance.json.JSONArray;
 
 
 /**
@@ -27,8 +29,9 @@ public class TOMLParser implements AutoCloseable
     private String line;
     private StringBuilder buffer;
     private HashMap<String, List<String>> arrays;
-    private List<String> tables;
-    private String keyType;
+    // used to store the keys hierarchy
+    private List<String> tables = new ArrayList<String>();
+    private boolean inTable;
 //    private boolean first;
     
 
@@ -41,6 +44,7 @@ public class TOMLParser implements AutoCloseable
 
     public JSONObject parseObject() throws Exception
     {
+        line = reader.readLine();
         return parseNestedObject(0);
     }
     
@@ -52,56 +56,82 @@ public class TOMLParser implements AutoCloseable
         Object value;
 
 
-        // will need a while loop until no key-value pairs are left
-        key = parseKey();
-        value = parseValue();
 
+        // will need a while loop until no key-value pairs are left
+        while ((key = parseKey()) != null)
+        {
+
+// System.out.println("tables: " + tables);
+            value = parseValue();
 // System.out.println("key: " + key);
 // System.out.println("value: " + value);
+            
+
+     
 
 
-        // figure out the type of the value
-        if (value instanceof JSONObject)
-        {
-            object.put(key, value);            
-        }
-        else
-        {
-            value = (String) value;
-
-            // check if value is an integer / float / boolean
-            if (((String)value).matches("\\d+"))  
+            // figure out the type of the value and put it in the object
+            if (value instanceof JSONObject)
             {
-                object.put(key, Integer.parseInt((String)value));
+                if (object.containsKey(key))
+                {
+                    object.getJSONObject(key).putAll((JSONObject)value);
+                }
+                else
+                {
+                    object.put(key, value);            
+                }
             }
-            else if (((String)value).matches("\\d+\\.\\d+"))
-            {
-                object.put(key, Float.parseFloat((String)value));
-            }
-            else if (((String)value).matches("true|false"))
-            {
-                object.put(key, Boolean.parseBoolean((String)value));
-            }
-            // local date WORKS
-            else if (((String)value).matches("\\d{4}-\\d{2}-\\d{2}"))
-            {
-                object.put(key, LocalDate.parse((String)value));
-            }
-            // local time with optional fractional seconds WORKS
-            else if (((String)value).matches("\\d{2}:\\d{2}:\\d{2}") || ((String)value).matches("\\d{2}:\\d{2}:\\d{2}.\\d+"))
-            {
-                object.put(key, LocalTime.parse((String)value));
-            }
-            // local date time with optional fractional seconds T or space  WORKS
-            else if (((String)value).matches("\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}") || ((String)value).matches("\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}\\.\\d+"))
-            {
-                // ensure the separator is a T instead of a space
-                value = ((String)value).replace(" ", "T");
-                object.put(key, LocalDateTime.parse((String)value));
-            }// TODO: add support for offset date-time, inline table, array.
             else
             {
-                object.put(key, value);
+                // check if value is an integer / float / boolean
+                if (((String)value).matches("\\d+"))  
+                {
+                    object.put(key, Integer.parseInt((String)value));
+                }
+                else if (((String)value).matches("\\d+\\.\\d+"))
+                {
+                    object.put(key, Float.parseFloat((String)value));
+                }
+                else if (((String)value).matches("true|false"))
+                {
+                    object.put(key, Boolean.parseBoolean((String)value));
+                }
+                // local date WORKS
+                else if (((String)value).matches("\\d{4}-\\d{2}-\\d{2}"))
+                {
+                    object.put(key, LocalDate.parse((String)value));
+                }
+                // local time with optional fractional seconds WORKS
+                else if (((String)value).matches("\\d{2}:\\d{2}:\\d{2}") || ((String)value).matches("\\d{2}:\\d{2}:\\d{2}.\\d+"))
+                {
+                    object.put(key, LocalTime.parse((String)value));
+                }
+                // local date time with optional fractional seconds T or space  WORKS
+                else if (((String)value).matches("\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}") || ((String)value).matches("\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}\\.\\d+"))
+                {
+                    // ensure the separator is a T instead of a space
+                    value = ((String)value).replace(" ", "T");
+                    object.put(key, LocalDateTime.parse((String)value));
+                }// TODO: add support for offset date-time, inline table, array.
+                else
+                {
+                    object.put(key, value);
+                }
+            }
+
+System.out.println(object.toString());
+
+            if (inTable && tables.size() > 0)
+            {
+System.out.println("tables: " + tables);
+                tables.remove(tables.size() - 1);
+                if (tables.isEmpty())
+                {
+                    inTable = false;
+                }
+System.out.println(object.toString());
+                return object;
             }
         }
 
@@ -112,10 +142,19 @@ public class TOMLParser implements AutoCloseable
 
     private String parseKey() throws Exception
     {
+        String key;
+
         // find non empty, non comment line
-        while (line == null || line.isBlank() || line.startsWith("#"))
+
+        while (line != null && (line.isBlank() || line.startsWith("#")))
         {
+            // System.out.println("line: " + line);
             line = reader.readLine();
+        }
+
+        if (line == null)
+        {
+            return null;
         }
 
         line = line.trim(); // is this needed?
@@ -123,33 +162,42 @@ public class TOMLParser implements AutoCloseable
         //parse key
         if (isArray(line))
         {
-System.out.println("array");
-            return parseArrayKey();
+// System.out.println("array");
+            key = parseArrayKey();
+            // inTable = true;
+            // tables.add(key);
+            return key;
         }  
         else if (isTable(line))
         {
-System.out.println("table");
-            return parseTableKey();
+// System.out.println("table");
+            key = parseTableKey();
+            inTable = true;
+            tables.add(key);
+            return key;
         }
         else if (isQuoted(line))
         {
-System.out.println("quoted key");
+// System.out.println("quoted key");
             return parseQuotedKey();
         }
         else if (isSingleQuoted(line))
         {
-System.out.println("single quoted key");
+// System.out.println("single quoted key");
             return parseSingleQuotedKey();
-        }
-        else if (isBare(line))
-        {
-System.out.println("bare key");
-            return parseBareKey();
         }
         else if (isDotted(line))
         {
-System.out.println("dotted key");
-            return parseDottedKey();
+// System.out.println("dotted key");
+            key = parseDottedKey();
+            inTable = true; 
+            tables.add(key);
+            return key;
+        }
+        else if (isBare(line))
+        {
+// System.out.println("bare key");
+            return parseBareKey();
         }
         else
         {
@@ -304,37 +352,53 @@ System.out.println("dotted key");
     }
 
     // PROBLEM can be dotted/quoted inside the brackets, need structure for this, remembering the previous keys and their levels
-    private String parseTableKey()
+    private String parseTableKey() throws Exception
     {
-        StringBuilder key = new StringBuilder();
-        char c;
+        // new implementation
 
-        // remove the brackets
-        line = line.substring(1);
+        // remove the opening and closing brackets
+        line = line.substring(1, line.length()-1);
+        // parse the key recursively
+        return parseKey();
 
-        // iterate over the line
-        for (int i = 0; i < line.length(); i++)
-        {
-            c = line.charAt(i);
-            if (c == ']')
-            {
-                line = line.substring(i+1);
-                break;
-            }
-            key.append(c);
-        }
-        return key.toString();
+
+
+        // StringBuilder key = new StringBuilder();
+        // char c;
+
+        // // remove the brackets
+        // line = line.substring(1);
+
+        // // iterate over the line
+        // for (int i = 0; i < line.length(); i++)
+        // {
+        //     c = line.charAt(i);
+        //     if (c == ']')
+        //     {
+        //         line = line.substring(i+1);
+        //         break;
+        //     }
+        //     key.append(c);
+        // }
+        // return key.toString();
     }
 
 
 
     
 
+    
+
+
+
 
     private Object parseValue() throws Exception
     {
+        String value;
+
         // skip over whitespace characters
         skipWhitespace();
+
 
         // if first character is '=', we have a simple, non-nested value
         if (line.charAt(0) == '=')
@@ -361,11 +425,17 @@ System.out.println("dotted key");
             }
             else if (line.contains("#"))
             {
-                return line.substring(0, line.indexOf("#")).trim();
+                // record the value before the comment
+                value = line.substring(0, line.indexOf("#")).trim();
+                // move past the comment
+                line = line.substring(line.indexOf("#")+1);
+                return value;
             }
             else
             {
-                return line.trim();
+                value = line.trim();
+                line = reader.readLine();
+                return value;
             }
         }
         else
@@ -374,6 +444,7 @@ System.out.println("dotted key");
         }
     }
     
+
 
 
 
@@ -404,7 +475,7 @@ System.out.println("dotted key");
     }
 
 
-    // TDDO Double check this code
+    // TODO Double check this code
     private boolean isBare(String line)
     {
         char c;
@@ -464,7 +535,6 @@ System.out.println("dotted key");
     private boolean isDotted(String line)
     {
         char c;
-        boolean foundDot = false;
         boolean foundValidChar = false;
         int i = 0;
         
@@ -478,22 +548,11 @@ System.out.println("dotted key");
         while (i < line.length()) 
         {
             c = line.charAt(i);
-            
-            if (c == '=') 
-            {
-                // If we found a dot and at least one valid character, it's a dotted key
-                return foundDot && foundValidChar;
-            }
-            
+                 
             if (c == '.') 
             {
                 // If we find a dot after a valid character, mark it
-                if (foundValidChar) {
-                    foundDot = true;
-                } else {
-                    // Dot at the start or after another dot is invalid
-                    return false;
-                }
+                return foundValidChar;
             } else if (isAllowed(c)) 
             {
                 foundValidChar = true;
@@ -505,8 +564,18 @@ System.out.println("dotted key");
             i++;
         }
         
-        return foundDot && foundValidChar;
+        return false;
     }
+
+
+
+
+
+
+
+
+
+
 
     // Checks if the character is an ASCII letter, number, underscore, or dash
     private boolean isAllowed(char c)
@@ -534,6 +603,9 @@ System.out.println("dotted key");
             skipWhitespace();
         }
     }
+
+
+
 
 
 
