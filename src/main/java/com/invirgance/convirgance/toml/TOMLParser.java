@@ -18,192 +18,163 @@ import java.util.ArrayList;
 import com.invirgance.convirgance.json.JSONArray;
 
 
+
 /**
  *
  * @author timur
  */
 public class TOMLParser implements AutoCloseable
 {
-    private String mode;
     private BufferedReader reader;
     private String line;
-    private StringBuilder buffer;
-    private HashMap<String, List<String>> arrays;
     // used to store the keys hierarchy
-    private List<String> tables = new ArrayList<String>();
-    private boolean inTable;
-//    private boolean first;
+    private ArrayList<String> tables = new ArrayList<String>();
+    private boolean foundTable;
+
     
 
     
-    public TOMLParser(BufferedReader reader)
+    public TOMLParser(BufferedReader reader) throws IOException 
     {
         this.reader = reader;
+        this.line = reader.readLine();
     }
     
 
     public JSONObject parseObject() throws Exception
     {
-        line = reader.readLine();
-        return parseNestedObject(0);
-    }
-    
-    private JSONObject parseNestedObject(int level) throws Exception
-    {
         JSONObject object = new JSONObject(true);
-        int currentLevel = level;
-        String key;
-        Object value;
+        ArrayList<String> keys;
 
-
-
-        // will need a while loop until no key-value pairs are left
-        while ((key = parseKey()) != null)
-        {
-
-// System.out.println("tables: " + tables);
-            value = parseValue();
-// System.out.println("key: " + key);
-// System.out.println("value: " + value);
-            
-
-     
-
-
-            // figure out the type of the value and put it in the object
-            if (value instanceof JSONObject)
+        
+        while ((keys = parseKeys()) != null && keys.size() > 0)
+        {   
+System.out.println("returned keys: " + keys);
+            if (foundTable)
             {
-                if (object.containsKey(key))
-                {
-                    object.getJSONObject(key).putAll((JSONObject)value);
-                }
-                else
-                {
-                    object.put(key, value);            
-                }
-            }
-            else
-            {
-                // check if value is an integer / float / boolean
-                if (((String)value).matches("\\d+"))  
-                {
-                    object.put(key, Integer.parseInt((String)value));
-                }
-                else if (((String)value).matches("\\d+\\.\\d+"))
-                {
-                    object.put(key, Float.parseFloat((String)value));
-                }
-                else if (((String)value).matches("true|false"))
-                {
-                    object.put(key, Boolean.parseBoolean((String)value));
-                }
-                // local date WORKS
-                else if (((String)value).matches("\\d{4}-\\d{2}-\\d{2}"))
-                {
-                    object.put(key, LocalDate.parse((String)value));
-                }
-                // local time with optional fractional seconds WORKS
-                else if (((String)value).matches("\\d{2}:\\d{2}:\\d{2}") || ((String)value).matches("\\d{2}:\\d{2}:\\d{2}.\\d+"))
-                {
-                    object.put(key, LocalTime.parse((String)value));
-                }
-                // local date time with optional fractional seconds T or space  WORKS
-                else if (((String)value).matches("\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}") || ((String)value).matches("\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}\\.\\d+"))
-                {
-                    // ensure the separator is a T instead of a space
-                    value = ((String)value).replace(" ", "T");
-                    object.put(key, LocalDateTime.parse((String)value));
-                }// TODO: add support for offset date-time, inline table, array.
-                else
-                {
-                    object.put(key, value);
-                }
+                foundTable = false;
+                tables = keys;
+                // print tables
+                System.out.println("tables: " + tables);
+                continue;
+
             }
 
-System.out.println(object.toString());
+            setValue(object, keys, parseValue());
 
-            if (inTable && tables.size() > 0)
-            {
-System.out.println("tables: " + tables);
-                tables.remove(tables.size() - 1);
-                if (tables.isEmpty())
-                {
-                    inTable = false;
-                }
-System.out.println(object.toString());
-                return object;
-            }
         }
 
         return object;
     }
-    
 
 
-    private String parseKey() throws Exception
+
+
+    private void setValue(JSONObject record, ArrayList<String> keys, Object value)
     {
-        String key;
+        System.out.println("setting value: " + value);
+        //  first parse through the table hierarchy
+        for(int i=0; i<tables.size(); i++)
+        {
+            if(!record.containsKey(tables.get(i))) record.put(tables.get(i), new JSONObject());
+
+            record = record.getJSONObject(tables.get(i));
+        }
+
+        // then parse through the key hierarchy
+        for(int i=0; i<keys.size()-1; i++)
+        {
+            if(!record.containsKey(keys.get(i))) record.put(keys.get(i), new JSONObject());
+
+            record = record.getJSONObject(keys.get(i));
+        }
+
+        // finally set the value
+        System.out.println("keys: " + keys);
+        record.put(keys.get(keys.size()-1), value);
+    }
+
+
+
+
+    private ArrayList<String> parseKeys() throws Exception
+    {
+        ArrayList<String> keys = new ArrayList<String>();
 
         // find non empty, non comment line
-
         while (line != null && (line.isBlank() || line.startsWith("#")))
         {
-            // System.out.println("line: " + line);
             line = reader.readLine();
         }
 
-        if (line == null)
+        if (line == null) return null;
+        
+        line = line.trim(); // is this okay?
+
+        if (line.startsWith("[["))
         {
-            return null;
+            // TODO: how to handle arrays?
+            keys.add(parseArrayKey());
+            return keys;
+        }
+        else if (line.startsWith("["))
+        {
+            foundTable = true;
+            line = line.substring(1);
         }
 
-        line = line.trim(); // is this needed?
 
-        //parse key
-        if (isArray(line))
+        while (line != null && !line.isBlank() && !line.startsWith("=") && !line.startsWith("#"))
         {
-// System.out.println("array");
-            key = parseArrayKey();
-            // inTable = true;
-            // tables.add(key);
-            return key;
-        }  
-        else if (isTable(line))
-        {
-// System.out.println("table");
-            key = parseTableKey();
-            inTable = true;
-            tables.add(key);
-            return key;
+            // remove the closing brackets left after tables/arrays
+            if (line.startsWith("]"))
+            {
+                line = line.substring(1);
+                break;
+            }
+
+        
+
+            
+            skipWhitespace();
+
+            if (isQuoted(line))
+            {
+System.out.println("quoted key");
+                keys.add(parseQuotedKey());
+            }
+            else if (isSingleQuoted(line))
+            {
+System.out.println("single quoted key");
+                keys.add(parseSingleQuotedKey());
+            }
+            else if (isDotted(line))
+            {
+System.out.println("dotted key");
+                keys.add(parseDottedKey());
+            }
+            else if (isBare(line))
+            {
+System.out.println("bare key");
+                keys.add(parseBareKey());
+            }
+            else
+            {
+                throw new Exception("Invalid TOML Key Format: " + line);
+            } 
+            line = line.trim();
         }
-        else if (isQuoted(line))
-        {
-// System.out.println("quoted key");
-            return parseQuotedKey();
-        }
-        else if (isSingleQuoted(line))
-        {
-// System.out.println("single quoted key");
-            return parseSingleQuotedKey();
-        }
-        else if (isDotted(line))
-        {
-// System.out.println("dotted key");
-            key = parseDottedKey();
-            inTable = true; 
-            tables.add(key);
-            return key;
-        }
-        else if (isBare(line))
-        {
-// System.out.println("bare key");
-            return parseBareKey();
-        }
-        else
-        {
-            throw new Exception("Invalid TOML Key Format: " + line);
-        }
-    }  
+
+        System.out.println("returning keys: " + keys);
+
+        return keys;
+
+    }
+
+
+
+
+
 
 
 
@@ -299,16 +270,22 @@ System.out.println(object.toString());
         char c;
         int i;
 
-        // iterate over the line
-        for (i = 0; i < line.length(); i++)
+// System.out.println("parsing bare key: " + line);
+
+        skipWhitespace();
+        while (line != null && !line.isBlank())
         {
-            c = line.charAt(i);
-            if (c == '=' || c == ' ' || c == '\t')
+            c = line.charAt(0);
+            if (isAllowed(c))
             {
-                line = line.substring(i);
+                key.append(c);
+                line = line.substring(1);
+            }
+            else
+            {
                 break;
             }
-            key.append(c);
+
         }
         return key.toString();
     }
@@ -326,6 +303,9 @@ System.out.println(object.toString());
 
         return key.trim();
     }
+
+
+
 
     // PROBLEM can be dotted/quoted inside the brackets, need structure for this, remembering the previous keys and their levels
     private String parseArrayKey()
@@ -351,37 +331,6 @@ System.out.println(object.toString());
         return key.toString();
     }
 
-    // PROBLEM can be dotted/quoted inside the brackets, need structure for this, remembering the previous keys and their levels
-    private String parseTableKey() throws Exception
-    {
-        // new implementation
-
-        // remove the opening and closing brackets
-        line = line.substring(1, line.length()-1);
-        // parse the key recursively
-        return parseKey();
-
-
-
-        // StringBuilder key = new StringBuilder();
-        // char c;
-
-        // // remove the brackets
-        // line = line.substring(1);
-
-        // // iterate over the line
-        // for (int i = 0; i < line.length(); i++)
-        // {
-        //     c = line.charAt(i);
-        //     if (c == ']')
-        //     {
-        //         line = line.substring(i+1);
-        //         break;
-        //     }
-        //     key.append(c);
-        // }
-        // return key.toString();
-    }
 
 
 
@@ -413,11 +362,11 @@ System.out.println(object.toString());
             {
                 return parseQuotedKey();
             }
-            // array
-            else if (line.charAt(0) == '[') 
-            {
-                return parseTableKey();
-            }
+            // // array
+            // else if (line.charAt(0) == '[') 
+            // {
+            //     return parseTableKey();
+            // }
             // inline table
             else if (line.charAt(0) == '{') 
             {
@@ -440,15 +389,10 @@ System.out.println(object.toString());
         }
         else
         {
-            return parseNestedObject(1);
+            return parseObject();
         }
     }
     
-
-
-
-
-
 
 
 
@@ -464,39 +408,30 @@ System.out.println(object.toString());
         return (line.startsWith("'"));
     }
 
-    private boolean isArray(String line)
-    {
-        return (line.startsWith("[["));
-    }   
 
-    private boolean isTable(String line)
-    {
-        return (line.startsWith("["));
-    }
+
+
 
 
     // TODO Double check this code
     private boolean isBare(String line)
     {
+//System.out.println("found bare: " + line);
         char c;
         boolean whitespace = false;
         boolean bare = false;
         int i;
         
 
+        skipWhitespace();
+
         // Check each character in the key
         for (i = 0; i < line.length(); i++) 
         {
             c = line.charAt(i);
 
-            if ((c == ' ' || c == '\t')) 
-            {
-                if (!bare) continue; // skips through preceding whitespace
 
-                whitespace = true;  // sets flag for whitespace and breaks out of loop
-                break;  
-            }
-            else if (c == '=' && bare)
+            if ((c == '=' || c == ' ' || c == '\t')  && bare)
             {   
                 return true;
             }
@@ -510,26 +445,7 @@ System.out.println(object.toString());
             }
         }
 
-        if (whitespace)
-        {
-
-            while (i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t'))
-            {
-                i++;
-            }
-
-
-            if (i < line.length() && line.charAt(i) == '=')
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        return false;
+        return bare;
     }
 
     private boolean isDotted(String line)
@@ -538,11 +454,6 @@ System.out.println(object.toString());
         boolean foundValidChar = false;
         int i = 0;
         
-        // Skip leading whitespace
-        while (i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) 
-        {
-            i++;
-        }
         
         // Check each character until we find an equals sign or invalid character
         while (i < line.length()) 
@@ -587,12 +498,16 @@ System.out.println(object.toString());
     }
     
     
+
+
+
     private void skipWhitespace()
     {
         while ((!line.isBlank()) && (line.charAt(0) == ' ' || line.charAt(0) == '\t'))
         {
             line = line.substring(1);
         }
+
         if (line.isBlank())
         {
             try {
@@ -618,3 +533,143 @@ System.out.println(object.toString());
     
     
 }
+
+
+
+
+//             // figure out the type of the value and put it in the object
+//             if (value instanceof JSONObject)
+//             {
+//                 if (object.containsKey(key))
+//                 {
+//                     object.getJSONObject(key).putAll((JSONObject)value);
+//                 }
+//                 else
+//                 {
+//                     object.put(key, value);            
+//                 }
+//             }
+//             else
+//             {
+//                 // check if value is an integer / float / boolean
+//                 if (((String)value).matches("\\d+"))  
+//                 {
+//                     object.put(key, Integer.parseInt((String)value));
+//                 }
+//                 else if (((String)value).matches("\\d+\\.\\d+"))
+//                 {
+//                     object.put(key, Float.parseFloat((String)value));
+//                 }
+//                 else if (((String)value).matches("true|false"))
+//                 {
+//                     object.put(key, Boolean.parseBoolean((String)value));
+//                 }
+//                 // local date WORKS
+//                 else if (((String)value).matches("\\d{4}-\\d{2}-\\d{2}"))
+//                 {
+//                     object.put(key, LocalDate.parse((String)value));
+//                 }
+//                 // local time with optional fractional seconds WORKS
+//                 else if (((String)value).matches("\\d{2}:\\d{2}:\\d{2}") || ((String)value).matches("\\d{2}:\\d{2}:\\d{2}.\\d+"))
+//                 {
+//                     object.put(key, LocalTime.parse((String)value));
+//                 }
+//                 // local date time with optional fractional seconds T or space  WORKS
+//                 else if (((String)value).matches("\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}") || ((String)value).matches("\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}\\.\\d+"))
+//                 {
+//                     // ensure the separator is a T instead of a space
+//                     value = ((String)value).replace(" ", "T");
+//                     object.put(key, LocalDateTime.parse((String)value));
+//                 }// TODO: add support for offset date-time, inline table, array.
+//                 else
+//                 {
+//                     object.put(key, value);
+//                 }
+//             }
+
+// // System.out.println(object.toString());
+
+//             if (inTable && tables.size() > 0)
+//             {
+// // System.out.println("tables: " + tables);
+//                 tables.remove(tables.size() - 1);
+//                 if (tables.isEmpty())
+//                 {
+//                     inTable = false;
+//                 }
+// // System.out.println(object.toString());
+//                 return object;
+//             }
+
+
+
+
+
+
+
+    // private List<String> parseKey() throws Exception
+    // {
+    //     List<String> keys = new ArrayList<String>();
+
+    //     // find non empty, non comment line
+
+    //     while (line != null && (line.isBlank() || line.startsWith("#")))
+    //     {
+    //         // System.out.println("line: " + line);
+    //         line = reader.readLine();
+    //     }
+
+    //     if (line == null)
+    //     {
+    //         return null;
+    //     }
+
+    //     line = line.trim(); // is this needed?
+
+        
+
+//         //parse key
+//         if (isArray(line))
+//         {
+// // System.out.println("array");
+//             keys.add(parseArrayKey());
+//             // inTable = true;
+
+//             return keys;
+//         }  
+//         else if (isTable(line))
+//         {
+// // System.out.println("table");
+//             keys.add(parseTableKey());
+//             foundTable = true;
+//             // tables.add(key);
+//             return keys;
+//         }
+//         else if (isQuoted(line))
+//         {
+// // System.out.println("quoted key");
+//             return parseQuotedKey();
+//         }
+//         else if (isSingleQuoted(line))
+//         {
+// // System.out.println("single quoted key");
+//             return parseSingleQuotedKey();
+//         }
+//         else if (isDotted(line))
+//         {
+// // System.out.println("dotted key");
+//             key = parseDottedKey();
+//             foundTable = true; 
+//             tables.add(key);
+//             return key;
+//         }
+//         else if (isBare(line))
+//         {
+// // System.out.println("bare key");
+//             return parseBareKey();
+//         }
+//         else
+//         {
+//             throw new Exception("Invalid TOML Key Format: " + line);
+//         }
+//     }  
