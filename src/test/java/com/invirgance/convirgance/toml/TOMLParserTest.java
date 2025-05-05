@@ -26,6 +26,7 @@ public class TOMLParserTest
     public void printline()
     {
         System.out.println("");
+        System.out.println("");
     }
     
     
@@ -39,7 +40,7 @@ public class TOMLParserTest
         
         JSONObject object = parser.parseObject();
 
-        System.out.println(object.toString());
+        System.out.println(object.toString(2));
     }
 
     
@@ -52,7 +53,7 @@ public class TOMLParserTest
         
         JSONObject object = parser.parseObject();
 
-        System.out.println(object.toString());
+        System.out.println(object.toString(2));
     }
 
     
@@ -65,7 +66,7 @@ public class TOMLParserTest
         
         JSONObject object = parser.parseObject();
 
-        System.out.println(object.toString());
+        System.out.println(object.toString(2));
     }
 
     
@@ -78,7 +79,7 @@ public class TOMLParserTest
         
         JSONObject object = parser.parseObject();
 
-        System.out.println(object.toString());
+        System.out.println(object.toString(2));
     }
 
     
@@ -91,7 +92,7 @@ public class TOMLParserTest
         
         JSONObject object = parser.parseObject();
 
-        System.out.println(object.toString());
+        System.out.println(object.toString(2));
     }
     
     
@@ -104,7 +105,7 @@ public class TOMLParserTest
         
         JSONObject object = parser.parseObject();
 
-        System.out.println(object.toString());
+        System.out.println(object.toString(2));
     }
     
     
@@ -117,7 +118,7 @@ public class TOMLParserTest
         
         JSONObject object = parser.parseObject();
 
-        System.out.println(object.toString());
+        System.out.println(object.toString(2));
     }
 
     

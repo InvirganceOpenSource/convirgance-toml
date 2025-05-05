@@ -1,2 +1,18 @@
 [dog."tater.man"] 
 type.name = "pug"
+
+[cat]
+name = "lucy"
+food = "mice"
+
+
+
+[ice-cream.flavors]
+chocolate = 1
+strawberry = 8
+
+
+
+[ice-cream]
+colors.chocolate = "brown"
+colors.strawberry = "red"

@@ -2,3 +2,51 @@
 physical.color = "orange"
 physical.shape = "round"
 site."google.com" = true
+
+
+#
+#["name"]
+#["physical", "color"]
+#["physical", "shape"]
+#["site", "google.com"]
+#
+#private void setValue(JSONObject record, String[] key, Object value)
+#{
+#    for(int i=0; i<key.length-1; i++)
+#    {
+#        if(!record.containsKey(key[i])) record.put(key[i], new JSONObject());
+#
+#        record = record.getJSONObject(key[i]);
+#    }
+#
+#    record.put(key[key.length-1], value);
+#}
+#
+#
+## table case:
+#
+#
+#String[] parsePath(String key) {...}
+#
+#parseTable(String key)
+#{
+#    String[] path = parsePath(key);
+#    JSONObject record = this.record;
+#
+#    for(int i=0; i<path.length; i++)
+#    {
+#        if(!record.containsKey(path[i])) record.put(path[i], new JSONObject());
+#
+#        record = record.getJSONObject(path[i]);
+#    }
+#
+#    return record;
+#}
+#
+#parseObject()
+#{
+#    JSONObject record = this.record;
+#    String key = getKey();
+#
+#    if(isTable(key)) record = parseTable(key);
+#}
