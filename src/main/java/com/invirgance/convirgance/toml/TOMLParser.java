@@ -132,7 +132,7 @@ public class TOMLParser implements AutoCloseable
             if (line.startsWith("\""))
             {
 // System.out.println("quoted key");
-                keys.add(parseQuotedKey());
+                keys.add(parseString());
             }
             else if (line.startsWith("'"))
             {
@@ -164,51 +164,74 @@ public class TOMLParser implements AutoCloseable
 
 
 
-
-
-
-
-
-
-
-    private String parseQuotedKey()
+    private String parseString() throws IOException
     {
         StringBuilder key = new StringBuilder();
         boolean escaped = false;
         char c;
         int i;
 
+
+        // todo: handle basic multiline string if string starts with """
+
+        if(line.charAt(0) != '"') throw new IOException("Expected \" but found " + line.charAt(0));
+
         // remove opening quote
         line = line.substring(1);
-
 
         // iterate over the line
         for (i = 0; i < line.length(); i++)
         {
             c = line.charAt(i);
 
-            // handle escaped characters without appending
-            if (c == '\\' && !escaped) 
+
+            if (c == '"') return key.toString();
+
+            if (c != '\\')
             {
-                escaped = true;
+                key.append(c);
                 continue;
             }
-            // handle closing quote
-            else if (c == '"' && !escaped) 
+
+            // handle escaped characters
+            i += 1;
+            c = line.charAt(i);
+
+
+            switch(c)
             {
-                line = line.substring(i+1);
-                break;
+                case 'b':
+                    key.append('\b');
+                    break;
+                case 't':
+                    key.append('\t');
+                    break;  
+                case 'n':
+                    key.append('\n');
+                    break;
+                case 'f':
+                    key.append('\f');
+                    break;      
+                case 'r':
+                    key.append('\r');
+                    break;
+                case '"':
+                    key.append('"');
+                    break;
+                case '\\':
+                    key.append('\\');
+                    break;
+                case 'u':
+                    key.append(parseUnicode()); // TODO: implement this
+                    break;
+                case 'U':
+                    key.append(parseUnicode()); // TODO: implement this
+                    break;
+                default:
+                    throw new IOException("Unexpected string escape \\" + c);
             }
-
-            // append character
-            if (escaped){
-                key.append("\\");
-            }
-            key.append(c);
-            escaped = false;
         }
-
-        return key.toString();
+        throw new IOException("Reached end of line before parsing completed");
     }
 
 
@@ -351,7 +374,7 @@ public class TOMLParser implements AutoCloseable
             // if the value is a string or array or inline table, we need to handle the escaped characters
             if (line.charAt(0) == '"')
             {
-                return parseQuotedKey();
+                return parseString();
             }
             // // array
             // else if (line.charAt(0) == '[') 
