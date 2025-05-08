@@ -11,9 +11,8 @@ import java.util.ArrayList;
 
 
 
-
 /**
- *
+ * Provides support for parsing TOML files into JSON objects using a streaming approach.
  * @author timur
  */
 public class TOMLParser implements AutoCloseable
@@ -47,7 +46,6 @@ public class TOMLParser implements AutoCloseable
             {
                 foundTable = false;
                 tables = keys;
-                // print tables
 // System.out.println("tables: " + tables);
                 continue;
 
@@ -65,7 +63,7 @@ public class TOMLParser implements AutoCloseable
 
     private void setValue(JSONObject record, ArrayList<String> keys, Object value)
     {
-        System.out.println("setting value: " + value);
+// System.out.println("setting value: " + value);
         //  first parse through the table hierarchy
         for(int i=0; i<tables.size(); i++)
         {
@@ -83,7 +81,7 @@ public class TOMLParser implements AutoCloseable
         }
 
         // finally set the value
-        System.out.println("keys: " + keys);
+// System.out.println("keys: " + keys);
         record.put(keys.get(keys.size()-1), value);
     }
 
@@ -133,22 +131,22 @@ public class TOMLParser implements AutoCloseable
 
             if (isQuoted(line))
             {
-System.out.println("quoted key");
+// System.out.println("quoted key");
                 keys.add(parseQuotedKey());
             }
             else if (isSingleQuoted(line))
             {
-System.out.println("single quoted key");
+// System.out.println("single quoted key");
                 keys.add(parseSingleQuotedKey());
             }
             else if (isDotted(line))
             {
-System.out.println("dotted key");
+// System.out.println("dotted key");
                 keys.add(parseDottedKey());
             }
             else if (isBare(line))
             {
-System.out.println("bare key");
+// System.out.println("bare key");
                 keys.add(parseBareKey());
             }
             else
@@ -158,7 +156,7 @@ System.out.println("bare key");
             line = line.trim();
         }
 
-        System.out.println("returning keys: " + keys);
+// System.out.println("returning keys: " + keys);
 
         return keys;
 
