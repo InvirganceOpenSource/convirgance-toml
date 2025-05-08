@@ -129,12 +129,12 @@ public class TOMLParser implements AutoCloseable
             
             skipWhitespace();
 
-            if (isQuoted(line))
+            if (line.startsWith("\""))
             {
 // System.out.println("quoted key");
                 keys.add(parseQuotedKey());
             }
-            else if (isSingleQuoted(line))
+            else if (line.startsWith("'"))
             {
 // System.out.println("single quoted key");
                 keys.add(parseSingleQuotedKey());
@@ -389,16 +389,6 @@ public class TOMLParser implements AutoCloseable
 
 
 
-    private boolean isQuoted(String line)
-    {
-        return (line.startsWith("\""));
-    }
-
-    private boolean isSingleQuoted(String line)
-    {
-        return (line.startsWith("'"));
-    }
-
 
 
 
@@ -438,6 +428,9 @@ public class TOMLParser implements AutoCloseable
 
         return bare;
     }
+
+
+
 
     private boolean isDotted(String line)
     {
