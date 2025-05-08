@@ -42,13 +42,13 @@ public class TOMLParser implements AutoCloseable
         
         while ((keys = parseKeys()) != null && keys.size() > 0)
         {   
-System.out.println("returned keys: " + keys);
+// System.out.println("returned keys: " + keys);
             if (foundTable)
             {
                 foundTable = false;
                 tables = keys;
                 // print tables
-                System.out.println("tables: " + tables);
+// System.out.println("tables: " + tables);
                 continue;
 
             }
