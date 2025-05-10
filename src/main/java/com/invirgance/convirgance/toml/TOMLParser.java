@@ -243,7 +243,7 @@ public class TOMLParser implements AutoCloseable
 
 
 
-    
+
     private String parseMultilineString() throws IOException
     {
         throw new IOException("Multiline strings are not yet supported");
@@ -366,63 +366,54 @@ public class TOMLParser implements AutoCloseable
 
 
 
-    
-
-    
-
-
-
 
     private Object parseValue() throws Exception
     {
         String value;
+        char c;
 
-        // skip over whitespace characters
+
+        skipWhitespace();
+
+        if (line.charAt(0) != '=') throw new Exception("Expected = but found " + line.charAt(0));
+        
+        line = line.substring(1);
         skipWhitespace();
 
 
-        // if first character is '=', we have a simple, non-nested value
-        if (line.charAt(0) == '=')
+
+
+
+        // if the value is a string or array or inline table, we need to handle the escaped characters
+        if (line.charAt(0) == '"')
         {
-            // move past the equals sign and skip over whitespace characters
-            line = line.substring(1);
-            skipWhitespace();
-
-
-            // if the value is a string or array or inline table, we need to handle the escaped characters
-            if (line.charAt(0) == '"')
-            {
-                return parseString();
-            }
-            // // array
-            // else if (line.charAt(0) == '[') 
-            // {
-            //     return parseTableKey();
-            // }
-            // inline table
-            else if (line.charAt(0) == '{') 
-            {
-                throw new Exception("Nested tables are not yet supported");
-            }
-            else if (line.contains("#"))
-            {
-                // record the value before the comment
-                value = line.substring(0, line.indexOf("#")).trim();
-                // move past the comment
-                line = line.substring(line.indexOf("#")+1);
-                return value;
-            }
-            else
-            {
-                value = line.trim();
-                line = reader.readLine();
-                return value;
-            }
+            return parseString();
+        }
+        // // array
+        // else if (line.charAt(0) == '[') 
+        // {
+        //     return parseTableKey();
+        // }
+        // inline table
+        else if (line.charAt(0) == '{') 
+        {
+            throw new Exception("Nested tables are not yet supported");
+        }
+        else if (line.contains("#"))
+        {
+            // record the value before the comment
+            value = line.substring(0, line.indexOf("#")).trim();
+            // move past the comment
+            line = line.substring(line.indexOf("#")+1);
+            return value;
         }
         else
         {
-            return parseObject();
+            value = line.trim();
+            line = reader.readLine();
+            return value;
         }
+
     }
     
 
@@ -553,6 +544,36 @@ public class TOMLParser implements AutoCloseable
     public void close() throws Exception
     {
         throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+    }
+
+
+    
+    private boolean parseBoolean() throws Exception {
+        if (line.startsWith("true")) 
+        {
+            line = line.substring(4).trim();
+
+            if (!line.isEmpty() && !line.startsWith("#")) 
+            {
+                throw new Exception("Invalid boolean value:");
+            }
+
+            line = line.substring(4);
+            return true;
+        } else if (line.startsWith("false")) 
+        {
+            line = line.substring(5).trim();
+
+            if (!line.isEmpty() && !line.startsWith("#")) 
+            {
+                throw new Exception("Invalid boolean value: " + line);
+            }
+
+            line = line.substring(5);
+            return false;
+        }
+        
+        throw new Exception("Invalid boolean value: " + line);
     }
 
 }
