@@ -100,34 +100,33 @@ public class TOMLParser implements AutoCloseable
 
         if (line == null) return null;
         
-        line = line.trim(); // is this okay?
+        skipWhitespace();
 
         if (line.startsWith("[["))
         {
             // TODO: how to handle arrays?
-            keys.add(parseArrayKey());
-            return keys;
+            throw new Exception("Arrays are not yet supported");
+            // keys.add(parseArrayKey());
+            // return keys;
         }
         else if (line.startsWith("["))
         {
-            foundTable = true;
-            line = line.substring(1);
+            throw new Exception("Tables are not yet supported");
+            // foundTable = true;
+            // line = line.substring(1);
         }
 
 
         while (line != null && !line.isBlank() && !line.startsWith("=") && !line.startsWith("#"))
         {
-            // remove the closing brackets left after tables/arrays
-            if (line.startsWith("]"))
+            // remove the closing brackets left after tables/arrays in needed
+            while (line.startsWith("]"))
             {
                 line = line.substring(1);
-                break;
             }
 
-        
-
-            
             skipWhitespace();
+
 
             if (line.startsWith("\""))
             {
@@ -157,13 +156,19 @@ public class TOMLParser implements AutoCloseable
         }
 
 // System.out.println("returning keys: " + keys);
-
         return keys;
-
     }
 
 
+    // TODO: handle basic multiline strings
+    // TODO: handle literal one-line strings
+    // TODO: handle literal multiline strings
+    
 
+
+
+    // works for basic one-line strings
+    // TODO: check compatibility with parsing quoted keys
     private String parseString() throws IOException
     {
         StringBuilder key = new StringBuilder();
@@ -185,7 +190,12 @@ public class TOMLParser implements AutoCloseable
             c = line.charAt(i);
 
 
-            if (c == '"') return key.toString();
+            if (c == '"')
+            {
+// System.out.println(key.toString());
+                line = line.substring(i+1);
+                return key.toString();
+            }
 
             if (c != '\\')
             {
@@ -222,11 +232,13 @@ public class TOMLParser implements AutoCloseable
                     key.append('\\');
                     break;
                 case 'u':
-                    key.append(parseUnicode()); // TODO: implement this
-                    break;
+                    throw new IOException("Unicode escape \\u is not yet supported");
+                //     key.append(parseUnicode()); // TODO: implement this
+                //     break;  
                 case 'U':
-                    key.append(parseUnicode()); // TODO: implement this
-                    break;
+                    throw new IOException("Unicode escape \\U is not yet supported");
+                //     key.append(parseUnicode()); // TODO: implement this
+                //     break;
                 default:
                     throw new IOException("Unexpected string escape \\" + c);
             }
@@ -282,9 +294,6 @@ public class TOMLParser implements AutoCloseable
     {
         StringBuilder key = new StringBuilder();
         char c;
-        int i;
-
-// System.out.println("parsing bare key: " + line);
 
         skipWhitespace();
         while (line != null && !line.isBlank())
@@ -304,20 +313,16 @@ public class TOMLParser implements AutoCloseable
         return key.toString();
     }
    
-    // might need level structure
+
     private String parseDottedKey()
     {
         String key;
 
-        // get the first part of the line until the dot
         key = line.substring(0, line.indexOf("."));
-        
-        // move line past the dot
         line = line.substring(line.indexOf(".")+1);
 
         return key.trim();
     }
-
 
 
 
