@@ -160,31 +160,27 @@ public class TOMLParser implements AutoCloseable
     }
 
 
-    // TODO: handle basic multiline strings
-    // TODO: handle literal one-line strings
-    // TODO: handle literal multiline strings
-    
-
-
 
     // works for basic one-line strings
     // TODO: check compatibility with parsing quoted keys
     private String parseString() throws IOException
     {
         StringBuilder key = new StringBuilder();
-        boolean escaped = false;
         char c;
         int i;
 
 
-        // todo: handle basic multiline string if string starts with """
 
         if(line.charAt(0) != '"') throw new IOException("Expected \" but found " + line.charAt(0));
+
+        if (line.startsWith("\"\"\""))
+        {
+            return parseMultilineString();
+        }
 
         // remove opening quote
         line = line.substring(1);
 
-        // iterate over the line
         for (i = 0; i < line.length(); i++)
         {
             c = line.charAt(i);
@@ -206,7 +202,6 @@ public class TOMLParser implements AutoCloseable
             // handle escaped characters
             i += 1;
             c = line.charAt(i);
-
 
             switch(c)
             {
@@ -244,6 +239,24 @@ public class TOMLParser implements AutoCloseable
             }
         }
         throw new IOException("Reached end of line before parsing completed");
+    }
+
+
+
+    
+    private String parseMultilineString() throws IOException
+    {
+        throw new IOException("Multiline strings are not yet supported");
+    }
+    
+    private String parseLiteralString() throws IOException
+    {
+        throw new IOException("Literal strings are not yet supported");
+    }
+
+    private String parseMultilineLiteralString() throws IOException
+    {
+        throw new IOException("Multiline literal strings are not yet supported");
     }
 
 
