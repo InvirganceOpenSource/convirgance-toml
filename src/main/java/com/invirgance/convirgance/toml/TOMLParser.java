@@ -382,38 +382,42 @@ public class TOMLParser implements AutoCloseable
 
 
 
+        // switch statement for the value types
+        // Values must have one of the following types.
+            // String
+            // Integer
+            // Float
+            // Boolean
+            // Offset Date-Time
+            // Local Date-Time
+            // Local Date
+            // Local Time
+            // Array
+            // Inline Table
+        // Unspecified values are invalid.
+        
+        c = line.charAt(0);
 
-
-        // if the value is a string or array or inline table, we need to handle the escaped characters
-        if (line.charAt(0) == '"')
+        switch(c)
         {
-            return parseString();
-        }
-        // // array
-        // else if (line.charAt(0) == '[') 
-        // {
-        //     return parseTableKey();
-        // }
-        // inline table
-        else if (line.charAt(0) == '{') 
-        {
-            throw new Exception("Nested tables are not yet supported");
-        }
-        else if (line.contains("#"))
-        {
-            // record the value before the comment
-            value = line.substring(0, line.indexOf("#")).trim();
-            // move past the comment
-            line = line.substring(line.indexOf("#")+1);
-            return value;
-        }
-        else
-        {
-            value = line.trim();
-            line = reader.readLine();
-            return value;
-        }
-
+            case '"':
+                return parseString();
+            case '\'':
+                return parseLiteralString();
+            case '[':
+                throw new Exception("Arrays are not yet supported");
+            case '{':
+                throw new Exception("Inline tables are not yet supported");
+            case 't':
+                return parseBoolean();
+            case 'f':
+                return parseBoolean();
+            default:
+                // integer, float, offset date-time, local date-time, local date, local time
+                // TODO: implement this
+                throw new Exception("Unsupported value type: " + c);
+        }  
+   
     }
     
 
@@ -572,7 +576,7 @@ public class TOMLParser implements AutoCloseable
             line = line.substring(5);
             return false;
         }
-        
+
         throw new Exception("Invalid boolean value: " + line);
     }
 
